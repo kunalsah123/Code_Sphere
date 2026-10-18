@@ -3,6 +3,17 @@ const Submission = require("../models/submission");
 const User = require("../models/user");
 const { getlanguageById, submitBatch, submitToken } = require("../utils/problemUtility");
 
+const getExecutionErrorMessage = (err) => {
+  const responseData = err.response?.data;
+  const providerMessage = typeof responseData === 'string'
+    ? responseData
+    : responseData?.error || responseData?.message;
+
+  if (providerMessage) return String(providerMessage).slice(0, 400);
+  if (err.response?.status) return `Code execution provider returned HTTP ${err.response.status}.`;
+  return err.message || 'Code execution failed. Please try again.';
+};
+
 const submitCode = async (req, res) => {
 
   // 
@@ -24,6 +35,7 @@ const submitCode = async (req, res) => {
 
     //    Fetch the problem from database
     const problem = await Problem.findById(problemId);
+    if (!problem) return res.status(404).send('Problem not found');
     //    testcases(Hidden)
 
     //   Kya apne submission store kar du pehle....
@@ -39,6 +51,7 @@ const submitCode = async (req, res) => {
     //    Judge0 code ko submit karna hai
 
     const languageId = getlanguageById(language);
+    if (!languageId) return res.status(400).send('Unsupported programming language');
 
     const submissions = problem.hiddenTestCases.map((testcase) => ({
       source_code: code,
@@ -94,9 +107,11 @@ const submitCode = async (req, res) => {
 
     // req.result == user Information
 
-    if (!req.result.problemSolved.includes(problemId)) {
-      req.result.problemSolved.push(problemId);
-      await req.result.save();
+    if (status === 'accepted') {
+      await User.updateOne(
+        { _id: req.result._id },
+        { $addToSet: { problemSolved: problemId } }
+      );
     }
 
     const accepted = (status == 'accepted')
@@ -110,7 +125,9 @@ const submitCode = async (req, res) => {
 
   }
   catch (err) {
-    res.status(500).send("Internal Server Error " + err);
+    const message = getExecutionErrorMessage(err);
+    console.error('Code submission failed:', { status: err.response?.status, message });
+    res.status(err.response ? 502 : 500).json({ error: message });
   }
 }
 
@@ -129,6 +146,7 @@ const runCode = async (req, res) => {
 
     //    Fetch the problem from database
     const problem = await Problem.findById(problemId);
+    if (!problem) return res.status(404).send('Problem not found');
     //    testcases(Hidden)
     if (language === 'cpp')
       language = 'c++'
@@ -136,6 +154,7 @@ const runCode = async (req, res) => {
     //    Judge0 code ko submit karna hai
 
     const languageId = getlanguageById(language);
+    if (!languageId) return res.status(400).send('Unsupported programming language');
 
     const submissions = problem.visibleTestCases.map((testcase) => ({
       source_code: code,
@@ -185,7 +204,9 @@ const runCode = async (req, res) => {
 
   }
   catch (err) {
-    res.status(500).send("Internal Server Error " + err);
+    const message = getExecutionErrorMessage(err);
+    console.error('Code run failed:', { status: err.response?.status, message });
+    res.status(err.response ? 502 : 500).json({ error: message });
   }
 }
 

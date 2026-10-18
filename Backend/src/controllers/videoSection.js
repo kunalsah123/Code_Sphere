@@ -22,12 +22,26 @@ cloudinary.config({
     api_secret: process.env.CLOUD_API_SECRET
 });
 
+const cloudinaryReady = () => Boolean(
+    process.env.CLOUD_NAME && process.env.CLOUD_API_KEY && process.env.CLOUD_API_SECRET
+);
+
+const respondIfCloudinaryMissing = (res) => {
+    if (cloudinaryReady()) return false;
+    res.status(503).json({
+        success: false,
+        error: 'Cloudinary is not configured. Set CLOUD_NAME, CLOUD_API_KEY, and CLOUD_API_SECRET in Backend/.env, then restart the backend.'
+    });
+    return true;
+};
+
 
 // ================== GENERATE UPLOAD SIGNATURE ==================
 // Jab hum client side se directly Cloudinary pe video upload karna chahte hain,
 // to ek secure "signature" generate karna padta hai jo server side se banega.
 // Ye security ke liye hota hai taki koi random banda bina authorization ke upload na kar sake.
 const generateUploadSignature = async (req, res) => {
+    if (respondIfCloudinaryMissing(res)) return;
     try {
         const { problemId } = req.params;
 
@@ -80,6 +94,7 @@ const generateUploadSignature = async (req, res) => {
 // uska ek DB record banana padta hai future reference ke liye.
 // Isme hum store karte hain: problemId, userId, video ka URL, duration, thumbnail, etc.
 const saveVideoMetaData = async (req, res) => {
+    if (respondIfCloudinaryMissing(res)) return;
     try {
         const {
             problemId,
@@ -159,18 +174,17 @@ const saveVideoMetaData = async (req, res) => {
 // 1) Cloudinary se (actual video file)
 // 2) Database se (video ka record)
 const deleteVideo = async (req, res) => {
+    if (respondIfCloudinaryMissing(res)) return;
     try {
         // TODO: Yaha pe logic likhna hoga
         // 1) req.params se video id / public_id lena
         const { problemId } = req.params;
-        const userId = req.result._id;
-        // Apne MongoDB se uska record delete karna
-        const video = await solutionVideo.findOneAndDelete({problemId : problemId})
+        const video = await solutionVideo.findOne({ problemId });
         if (!video) {
             return res.status(404).json({ error: 'Video Not Found !' })
         }
-        // 2) Cloudinary ke API se us video ko delete karna
         await cloudinary.uploader.destroy(video.cloudinaryPublicId, { resource_type: 'video', invalidate: true });
+        await solutionVideo.deleteOne({ _id: video._id });
 
 
         // 4) Response dena -> "Video deleted successfully"

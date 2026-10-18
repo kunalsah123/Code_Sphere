@@ -124,6 +124,8 @@ data/
 
 # Package manager files
 package-lock.json
+!Backend/package-lock.json
+!frontend/package-lock.json
 yarn.lock
 pnpm-lock.yaml
 

@@ -36,7 +36,7 @@ function AdminUpload() {
         try {
             // Step 1: Get upload signature from backend
             const signatureResponse = await axiosClient.get(`/video/create/${problemId}`);
-            const { signature, timestamp, public_id, api_key, cloud_name, upload_url } = signatureResponse.data;
+            const { signature, timestamp, public_id, api_key, upload_url } = signatureResponse.data;
 
             // Step 2: Create FormData for Cloudinary upload
             const formData = new FormData();
@@ -80,15 +80,6 @@ function AdminUpload() {
             setUploading(false);
             setUploadProgress(0);
         }
-    };
-
-    // Format file size
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
     // Format duration

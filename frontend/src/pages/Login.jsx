@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router';
 import { loginUser } from "../authSlice";
 import { useEffect, useState } from 'react';
+// eslint-disable-next-line no-unused-vars -- Used by JSX motion elements below.
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff } from 'react-icons/fi';
 
@@ -16,7 +17,7 @@ const loginSchema = z.object({
 function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, error } = useSelector((state) => state.auth);
+  const { isAuthenticated, loading, error: authError } = useSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
   const [bubbles, setBubbles] = useState([]);
 
@@ -97,6 +98,11 @@ function Login() {
             <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
             <p className="text-gray-400">Sign in to your account</p>
           </div>
+          {authError && (
+            <div role="alert" className="mb-5 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {authError}
+            </div>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="form-group">
               <div className="relative">

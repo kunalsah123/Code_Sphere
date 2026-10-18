@@ -1,3 +1,4 @@
+/* global module, require */
 // tailwind.config.js
 module.exports = {
   content: [

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
 import Editor from '@monaco-editor/react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import axiosClient from "../utils/axiosClient"
 import SubmissionHistory from "../components/SubmissionHistory"
 import ChatAi from '../components/ChatAI';
@@ -24,10 +23,8 @@ const ProblemPage = () => {
     const [activeLeftTab, setActiveLeftTab] = useState('description');
     const [activeRightTab, setActiveRightTab] = useState('code');
     const editorRef = useRef(null);
+    const navigate = useNavigate();
     let { problemId } = useParams();
-
-    const { handleSubmit } = useForm();
-
 
     //     _id: '507f1f77bcf86cd799439011',
     //     title: 'Two Sum',
@@ -194,7 +191,7 @@ const ProblemPage = () => {
         };
 
         fetchProblem();
-    }, [problemId]);
+    }, [problemId, selectedLanguage]);
 
     // Update code when language changes
     useEffect(() => {
@@ -216,6 +213,16 @@ const ProblemPage = () => {
         setSelectedLanguage(language);
     };
 
+    const handleCreateCollaborationRoom = async () => {
+        try {
+            const { data } = await axiosClient.post('/collaboration/rooms', { problemId, code, language: selectedLanguage });
+            const inviteToken = new URL(data.inviteUrl).pathname.split('/').pop();
+            navigate(`/room/${inviteToken}`);
+        } catch (error) {
+            window.alert(error.response?.data?.error || 'Could not create a collaboration room. Please sign in and try again.');
+        }
+    };
+
     const handleRun = async () => {
         setLoading(true);
         setRunResult(null);
@@ -234,7 +241,12 @@ const ProblemPage = () => {
             console.error('Error running code:', error);
             setRunResult({
                 success: false,
-                error: 'Internal server error'
+                error: error.response?.data?.error
+                    || error.response?.data?.message
+                    || (typeof error.response?.data === 'string' ? error.response.data : null)
+                    || error.message
+                    || 'Unable to run code. Please try again.',
+                testCases: []
             });
             setLoading(false);
             setActiveRightTab('testcase');
@@ -417,7 +429,7 @@ const ProblemPage = () => {
             </div>
 
             {/* Right Panel */}
-            <div className="w-1/2 flex flex-col">
+            <div className="w-1/2 min-w-0 flex flex-col">
                 {/* Right Tabs */}
                 <div className="tabs tabs-bordered bg-base-200 px-4">
                     <button
@@ -441,9 +453,9 @@ const ProblemPage = () => {
                 </div>
 
                 {/* Right Content */}
-                <div className="flex-1 flex flex-col">
+                <div className="min-h-0 flex-1 flex flex-col">
                     {activeRightTab === 'code' && (
-                        <div className="flex-1 flex flex-col">
+                        <div className="min-h-0 flex-1 flex flex-col">
                             {/* Language Selector */}
                             <div className="flex justify-between items-center p-4 border-b border-base-300">
                                 <div className="flex gap-2">
@@ -457,6 +469,9 @@ const ProblemPage = () => {
                                         </button>
                                     ))}
                                 </div>
+                                <button className="btn btn-secondary btn-sm" onClick={handleCreateCollaborationRoom} disabled={!problem}>
+                                    Collaborate
+                                </button>
                             </div>
 
                             {/* Monaco Editor */}
@@ -492,32 +507,6 @@ const ProblemPage = () => {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="p-4 border-t border-base-300 flex justify-between">
-                                <div className="flex gap-2">
-                                    <button
-                                        className="btn btn-ghost btn-sm"
-                                        onClick={() => setActiveRightTab('testcase')}
-                                    >
-                                        Console
-                                    </button>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        className={`btn btn-outline btn-sm ${loading ? 'loading' : ''}`}
-                                        onClick={handleRun}
-                                        disabled={loading}
-                                    >
-                                        Run
-                                    </button>
-                                    <button
-                                        className={`btn btn-primary btn-sm ${loading ? 'loading' : ''}`}
-                                        onClick={handleSubmitCode}
-                                        disabled={loading}
-                                    >
-                                        Submit
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -551,13 +540,19 @@ const ProblemPage = () => {
                                         ) : (
                                             <div>
                                                 <h4 className="font-bold">❌ Error</h4>
+                                                {runResult.error && (
+                                                    <p className="mt-2 text-sm break-words">{runResult.error}</p>
+                                                )}
                                                 <div className="mt-4 space-y-2">
-                                                    {runResult.testCases.map((tc, i) => (
+                                                    {(Array.isArray(runResult.testCases) ? runResult.testCases : []).map((tc, i) => (
                                                         <div key={i} className="bg-base-100 p-3 rounded text-xs">
                                                             <div className="font-mono">
                                                                 <div><strong>Input:</strong> {tc.stdin}</div>
                                                                 <div><strong>Expected:</strong> {tc.expected_output}</div>
                                                                 <div><strong>Output:</strong> {tc.stdout}</div>
+                                                                {tc.stderr && <div className="text-red-500"><strong>Error:</strong> {tc.stderr}</div>}
+                                                                {tc.compile_output && <pre className="mt-2 whitespace-pre-wrap break-words text-red-500"><strong>Compiler:</strong> {tc.compile_output}</pre>}
+                                                                {tc.message && <div className="text-red-500"><strong>Message:</strong> {tc.message}</div>}
                                                                 <div className={tc.status_id == 3 ? 'text-green-600' : 'text-red-600'}>
                                                                     {tc.status_id == 3 ? '✓ Passed' : '✗ Failed'}
                                                                 </div>
@@ -609,6 +604,27 @@ const ProblemPage = () => {
                             )}
                         </div>
                     )}
+                </div>
+                <div className="flex shrink-0 items-center justify-between border-t border-base-300 bg-base-200 px-4 py-3">
+                    <button className="btn btn-ghost btn-sm" onClick={() => setActiveRightTab('code')}>
+                        Back to code
+                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            className={`btn btn-outline btn-sm ${loading ? 'loading' : ''}`}
+                            onClick={handleRun}
+                            disabled={loading}
+                        >
+                            Run
+                        </button>
+                        <button
+                            className={`btn btn-primary btn-sm ${loading ? 'loading' : ''}`}
+                            onClick={handleSubmitCode}
+                            disabled={loading}
+                        >
+                            Submit
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

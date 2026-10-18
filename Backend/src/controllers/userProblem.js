@@ -4,11 +4,11 @@ const User = require('../models/user');
 const { getlanguageById, submitBatch, submitToken } = require('../utils/problemUtility');
 
 const solutionVideo = require('../models/solutionVideo');
+const { getCachedJson, setCachedJson, invalidateProblemListCache } = require('../utils/cache');
 
 const createProblem = async (req, res) => {
 
-    console.log(req.body);
-    const { title, description, difficulty, tags, visibleTestCases, hiddenTestCases, startCode, referenceSolution, problemCreator } = req.body;
+    const { title, description, difficulty, tags, visibleTestCases, hiddenTestCases, startCode, referenceSolution } = req.body;
 
     if (!title || !description || !difficulty || !tags || !visibleTestCases || !hiddenTestCases || !startCode || !referenceSolution) {
         return res.status(400).send("All fields are required");
@@ -46,7 +46,6 @@ const createProblem = async (req, res) => {
             //we will check if all the results are correct or not
             //if not then we will throw an errorq
             const testResult = await submitToken(resultToken);
-            console.log(testResult);
             for (const test of testResult) {
                 if (test.status_id != 3) {
                     return res.status(400).send('Reference solution is not correct');
@@ -57,12 +56,13 @@ const createProblem = async (req, res) => {
 
 
         //we can now store the problem in the database
-        await Problem.create({
+        const createdProblem = await Problem.create({
             ...req.body,
             problemCreator: req.result._id
         })
+        await invalidateProblemListCache();
 
-        res.status(201).send("Problem Saved Successfully");
+        res.status(201).json({ success: true, message: 'Problem saved successfully', problemId: createdProblem._id });
 
 
     } catch (err) {
@@ -114,7 +114,6 @@ const updateProblem = async (req, res) => {
             const resultToken = submitresult.map(value => value.token);
 
             const testResult = await submitToken(resultToken);
-            console.log(testResult)
             for (const test of testResult) {
                 if (test.status_id !== 3) {
                     return res.status(400).send("One or more test cases failed");
@@ -123,6 +122,7 @@ const updateProblem = async (req, res) => {
         }
 
         const newProblem = await Problem.findByIdAndUpdate(id, { ...req.body }, { runValidators: true, new: true });
+        await invalidateProblemListCache();
         res.status(200).send(newProblem);
 
     } catch (err) {
@@ -147,6 +147,8 @@ const deleteProblem = async (req, res) => {
             return res.status(400).send("Problem is not deleted or Undefined !!");
         }
 
+        await invalidateProblemListCache();
+
         return res.status(200).send('Problem is Succesfully Deleted !!');
     }
     catch (err) {
@@ -165,7 +167,7 @@ const getProblemById = async (req, res) => {
         }
 
         //saaare data ko frontend pe bhejne ka koi zarorat nahi hian !!
-        const getProblem = await Problem.findById(id).select('_id title description difficulty tags visibleTestCases startCode referenceSolution hiddenTestCases');
+        const getProblem = await Problem.findById(id).select('_id title description difficulty tags visibleTestCases startCode referenceSolution');
 
 
         if (!getProblem) {
@@ -198,13 +200,13 @@ const getProblemById = async (req, res) => {
 const getAllProblem = async (req, res) => {
 
     try {
-        const getProblem = await Problem.find({}).select('_id title difficulty tags');
+        const cacheKey = 'cache:problems:list:v1';
+        const cachedProblems = await getCachedJson(cacheKey);
+        if (cachedProblems !== null) return res.status(200).json(cachedProblems);
 
-        if (getProblem.length == 0) {
-            return res.status(404).send("Problem is Missing !!");
-        }
-
-        res.status(200).send(getProblem)
+        const problems = await Problem.find({}).select('_id title difficulty tags').lean();
+        await setCachedJson(cacheKey, problems, 60);
+        return res.status(200).json(problems);
 
     }
     catch (err) {

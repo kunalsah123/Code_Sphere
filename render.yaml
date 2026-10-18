@@ -1,15 +1,48 @@
 services:
   - type: web
     name: codemaster-backend
-    env: node
-    plan: starter
-    buildCommand: cd Backend && npm install
+    runtime: node
+    plan: free
+    buildCommand: cd Backend && npm ci
     startCommand: cd Backend && npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        fromService:
-          type: web
-          name: codemaster-backend
-          property: port
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: FRONTEND_URL
+        value: https://codemaster-frontend.onrender.com
+      - key: CORS_ORIGINS
+        value: https://codemaster-frontend.onrender.com
+      - key: MONGO_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JUDGE0_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CLOUD_NAME
+        sync: false
+      - key: CLOUD_API_KEY
+        sync: false
+      - key: CLOUD_API_SECRET
+        sync: false
+
+  - type: web
+    name: codemaster-frontend
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://codemaster-backend.onrender.com
+      - key: NODE_VERSION
+        value: 22.12.0
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

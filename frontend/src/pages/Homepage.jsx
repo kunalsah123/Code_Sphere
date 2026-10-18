@@ -94,7 +94,7 @@ function Homepage() {
           {/* Center: Brand Name */}
           <div className="flex-none">
             <NavLink to="/" className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent hover:scale-105 transition-transform">
-              CodeMaster
+              CodeSphere
             </NavLink>
           </div>
 
@@ -121,6 +121,22 @@ function Homepage() {
                   </svg>
                 </div>
                 <ul className="mt-3 p-2 shadow-xl menu menu-sm dropdown-content bg-gray-800 rounded-xl border border-gray-700 w-52">
+                  <li>
+                    <NavLink to="/dashboard" className="hover:bg-blue-800/50 hover:text-blue-300 rounded-lg text-gray-200">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
+                      </svg>
+                      Dashboard
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink to="/profile" className="hover:bg-blue-800/50 hover:text-blue-300 rounded-lg text-gray-200">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM5 21a7 7 0 0114 0H5z" />
+                      </svg>
+                      My Profile
+                    </NavLink>
+                  </li>
                   <li>
                     <button onClick={handleLogout} className="hover:bg-red-800/50 hover:text-red-400 rounded-lg transition-colors text-gray-200">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

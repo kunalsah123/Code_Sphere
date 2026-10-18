@@ -1,6 +1,9 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axiosClient from './utils/axiosClient'
 
+const getApiErrorMessage = (error) =>
+  error.response?.data?.error || error.response?.data?.message || error.message || 'Request failed. Please try again.';
+
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData, { rejectWithValue }) => {
@@ -8,7 +11,7 @@ export const registerUser = createAsyncThunk(
     const response =  await axiosClient.post('/user/register', userData);
     return response.data.user;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(getApiErrorMessage(error));
     }
   }
 );
@@ -21,7 +24,7 @@ export const loginUser = createAsyncThunk(
       const response = await axiosClient.post('/user/login', credentials);
       return response.data.user;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(getApiErrorMessage(error));
     }
   }
 );
@@ -36,7 +39,7 @@ export const checkAuth = createAsyncThunk(
       if (error.response?.status === 401) {
         return rejectWithValue(null); // Special case for no session
       }
-      return rejectWithValue(error);
+      return rejectWithValue(getApiErrorMessage(error));
     }
   }
 );
@@ -48,7 +51,7 @@ export const logoutUser = createAsyncThunk(
       await axiosClient.post('/user/logout');
       return null;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(getApiErrorMessage(error));
     }
   }
 );
@@ -62,6 +65,9 @@ const authSlice = createSlice({
     error: null
   },
   reducers: {
+    updateUserProfile: (state, action) => {
+      if (state.user) state.user = { ...state.user, ...action.payload };
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -77,7 +83,7 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Something went wrong';
+        state.error = action.payload || action.error.message || 'Something went wrong';
         state.isAuthenticated = false;
         state.user = null;
       })
@@ -94,7 +100,7 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Something went wrong';
+        state.error = action.payload || action.error.message || 'Something went wrong';
         state.isAuthenticated = false;
         state.user = null;
       })
@@ -111,7 +117,7 @@ const authSlice = createSlice({
       })
       .addCase(checkAuth.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Something went wrong';
+        state.error = action.payload || null;
         state.isAuthenticated = false;
         state.user = null;
       })
@@ -129,11 +135,12 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Something went wrong';
+        state.error = action.payload || action.error.message || 'Something went wrong';
         state.isAuthenticated = false;
         state.user = null;
       });
   }
 });
 
+export const { updateUserProfile } = authSlice.actions;
 export default authSlice.reducer;

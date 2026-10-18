@@ -5,6 +5,14 @@ const submission = require('../models/submission')
 //for hashing the password
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const validator = require('validator');
+
+const cookieOptions = () => ({
+    maxAge: 60 * 60 * 1000,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+});
 
 
 
@@ -12,19 +20,16 @@ const register = async (req, res) => {
     try {
 
         //validate where all the fields are present or not
-        validate(req.body);
+        const registration = validate(req.body);
 
         //all data  will be in the req.body
-        const { firstName, emailId, password } = req.body;
+        const { firstName, emailId, password } = registration;
 
         //hashing the password
-        req.body.password = await bcrypt.hash(password, 10);
-
-        //only a user can register
-        req.body.role = 'user'; //default role
+        const hashedPassword = await bcrypt.hash(password, 10);
         //if all the fields are present then we will create the user
         //we will use the User model to create the user
-        const user = await User.create(req.body);
+        const user = await User.create({ firstName, emailId, password: hashedPassword, role: 'user' });
         const reply = {
             firstName: user.firstName,
             emailId: user.emailId,
@@ -32,25 +37,22 @@ const register = async (req, res) => {
             role: user.role
         }
 
-        const token = jwt.sign({ _id: user._id, emailId: emailId, role: user.role }, process.env.JWT_SECRET, { expiresIn: 60 * 60 });
+        const token = jwt.sign({ _id: user._id, emailId: emailId, role: user.role, tokenVersion: user.tokenVersion || 0 }, process.env.JWT_SECRET, { expiresIn: 60 * 60 });
 
         //setting the token in the cookie
-        res.cookie('token', token, { 
-            maxAge: 60 * 60 * 1000,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-        });
+        res.cookie('token', token, cookieOptions());
         res.status(201).json({
             user: reply,
             message: 'User Registered Successfully',
         })
 
     } catch (err) {
-        console.error(err);
-        return res.status(400).json({
-            sucess: false,
-            error: err.message
+        const duplicateEmail = err.code === 11000 && err.keyPattern?.emailId;
+        if (!duplicateEmail) console.error('Registration failed:', err.message);
+        return res.status(duplicateEmail ? 409 : 400).json({
+            success: false,
+            ...(duplicateEmail && { error: 'An account with this email already exists.' }),
+            ...(!duplicateEmail && { error: err.message })
         });
     }
 }
@@ -58,7 +60,8 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { emailId, password } = req.body;
+        const emailId = typeof req.body?.emailId === 'string' ? req.body.emailId.trim().toLowerCase() : '';
+        const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
         //checking if the emailId and password are present or not
         if (!emailId || !password) {
@@ -88,14 +91,9 @@ const login = async (req, res) => {
             role: user.role
         }
         //if the user is found then we will create a token
-        const token = jwt.sign({ _id: user._id, emailId: emailId, role: user.role }, process.env.JWT_SECRET, { expiresIn: 60 * 60 });
-        res.cookie('token', token, { 
-            maxAge: 60 * 60 * 1000,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-        });
-        res.status(201).json({
+        const token = jwt.sign({ _id: user._id, emailId: emailId, role: user.role, tokenVersion: user.tokenVersion || 0 }, process.env.JWT_SECRET, { expiresIn: 60 * 60 });
+        res.cookie('token', token, cookieOptions());
+        res.status(200).json({
             user: reply,
             message: "Loggged in Successfully !!"
         });
@@ -113,17 +111,15 @@ const login = async (req, res) => {
 const logout = async (req, res) => {
     try {
         const { token } = req.cookies;
-
         const payload = jwt.decode(token);
-
-
-        await redisClient.set(`token:${token}`, 'Blocked');
-        await redisClient.expireAt(`token:${token}`, payload.exp);
+        if (token && payload?.exp) {
+            await redisClient.set(`token:${token}`, 'Blocked', { EXAT: payload.exp });
+        }
         //Token added in the Redis Blocklist
         //clearing the cookie
 
-        res.cookie('token', null, { expires: new Date(Date.now()) });
-        res.send({
+        res.clearCookie('token', cookieOptions());
+        res.status(200).send({
             success: true,
             message: 'User Logged Out successfully'
         });
@@ -142,23 +138,23 @@ const adminRegister = async (req, res) => {
 
 
         //validate where all the fields are present or not
-        validate(req.body);
+        const registration = validate(req.body);
 
         //all data  will be in the req.body
-        const { firstName, emailId, password } = req.body;
+        const { firstName, emailId, password } = registration;
 
         //hashing the password
-        req.body.password = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
 
         //if all the fields are present then we will create the user
         //we will use the User model to create the user
-        const user = await User.create(req.body);
+        const user = await User.create({ ...registration, password: hashedPassword, role: 'admin' });
 
         const token = jwt.sign({ _id: user._id, emailId: emailId, role: user.role }, process.env.JWT_SECRET, { expiresIn: 60 * 60 });
 
         //setting the token in the cookie
-        res.cookie('token', token, { maxAge: 60 * 60 * 1000 });
+        res.cookie('token', token, cookieOptions());
         res.status(201).send({
             sucess: true,
             message: 'User Registered Successfully',
@@ -195,4 +191,85 @@ const deleteProfile = async (req, res) => {
     }
 }
 
-module.exports = { register, login, logout, adminRegister, deleteProfile };
+const getProfile = async (req, res) => {
+    res.json({
+        user: {
+            _id: req.result._id,
+            firstName: req.result.firstName,
+            lastName: req.result.lastName || '',
+            emailId: req.result.emailId,
+            role: req.result.role,
+            createdAt: req.result.createdAt
+        }
+    });
+};
+
+const updateProfile = async (req, res) => {
+    try {
+        const firstName = typeof req.body?.firstName === 'string' ? req.body.firstName.trim() : '';
+        const lastName = typeof req.body?.lastName === 'string' ? req.body.lastName.trim() : '';
+        if (firstName.length < 3 || firstName.length > 20) {
+            return res.status(400).json({ error: 'First name must be between 3 and 20 characters.' });
+        }
+        if (lastName && (lastName.length < 3 || lastName.length > 20)) {
+            return res.status(400).json({ error: 'Last name must be between 3 and 20 characters when provided.' });
+        }
+
+        req.result.firstName = firstName;
+        req.result.lastName = lastName || undefined;
+        await req.result.save();
+        res.json({
+            user: {
+                _id: req.result._id,
+                firstName: req.result.firstName,
+                lastName: req.result.lastName || '',
+                emailId: req.result.emailId,
+                role: req.result.role
+            },
+            message: 'Profile updated.'
+        });
+    } catch (error) {
+        console.error('Profile update failed:', error.message);
+        res.status(500).json({ error: 'Could not update your profile.' });
+    }
+};
+
+const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body || {};
+        if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+            return res.status(400).json({ error: 'Current password and new password are required.' });
+        }
+        if (!validator.isStrongPassword(newPassword, { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 })) {
+            return res.status(400).json({ error: 'New password must have at least 8 characters, including uppercase, lowercase, number, and symbol.' });
+        }
+        const matches = await bcrypt.compare(currentPassword, req.result.password);
+        if (!matches) return res.status(400).json({ error: 'Current password is incorrect.' });
+        if (await bcrypt.compare(newPassword, req.result.password)) {
+            return res.status(400).json({ error: 'Choose a new password different from your current password.' });
+        }
+
+        req.result.password = await bcrypt.hash(newPassword, 10);
+        req.result.tokenVersion = (req.result.tokenVersion || 0) + 1;
+        await req.result.save();
+
+        const oldToken = req.cookies?.token;
+        const oldPayload = oldToken ? jwt.decode(oldToken) : null;
+        if (oldToken && oldPayload?.exp) {
+            await redisClient.set(`token:${oldToken}`, 'Blocked', { EXAT: oldPayload.exp });
+        }
+        const token = jwt.sign({
+            _id: req.result._id,
+            emailId: req.result.emailId,
+            role: req.result.role,
+            tokenVersion: req.result.tokenVersion
+        }, process.env.JWT_SECRET, { expiresIn: 60 * 60 });
+        res.cookie('token', token, cookieOptions());
+        res.json({ success: true, message: 'Password changed. Other sessions have been signed out.' });
+    } catch (error) {
+        console.error('Password update failed:', error.message);
+        res.status(503).json({ error: 'Could not update your password. Please try again.' });
+    }
+};
+
+module.exports = { register, login, logout, adminRegister, deleteProfile, getProfile, updateProfile, changePassword };

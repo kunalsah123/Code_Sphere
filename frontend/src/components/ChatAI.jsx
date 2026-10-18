@@ -48,7 +48,7 @@ function ChatAI({ problem }) {
                 messages: updatedMessages,
                 title: problem.title,
                 description: problem.description,
-                visibleTestCases: problem.testCases,
+                visibleTestCases: problem.visibleTestCases,
                 startCode: problem.startCode
             });
 
@@ -66,7 +66,7 @@ function ChatAI({ problem }) {
             setMessages(prev => [...prev, {
                 role: 'model',
                 parts: [{
-                    text: error.response?.data?.message ||
+                    text: error.response?.data?.error || error.response?.data?.message ||
                         'Sorry, I encountered an issue. Please try again.'
                 }],
                 timestamp: new Date()
@@ -129,6 +129,10 @@ function ChatAI({ problem }) {
                             minLength: {
                                 value: 2,
                                 message: "Message must be at least 2 characters"
+                            },
+                            maxLength: {
+                                value: 2000,
+                                message: "Message must be 2,000 characters or fewer"
                             }
                         })}
                         disabled={isLoading}

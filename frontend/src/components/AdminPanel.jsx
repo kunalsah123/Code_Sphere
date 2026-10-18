@@ -10,7 +10,7 @@ const problemSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
-  tags: z.enum(['array', 'linkedList', 'graph', 'dp']),
+  tags: z.enum(['array', 'string', 'linked list', 'tree', 'graph', 'dynamic programming', 'sorting', 'searching']),
   visibleTestCases: z.array(
     z.object({
       input: z.string().min(1, 'Input is required'),
@@ -150,9 +150,13 @@ function AdminPanel() {
                   className={`select select-bordered w-full bg-gray-800 text-gray-200 border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 rounded-xl transition-all ${errors.tags && 'select-error border-red-500'}`}
                 >
                   <option value="array">Array</option>
-                  <option value="linkedList">Linked List</option>
+                  <option value="string">String</option>
+                  <option value="linked list">Linked List</option>
+                  <option value="tree">Tree</option>
                   <option value="graph">Graph</option>
-                  <option value="dp">DP</option>
+                  <option value="dynamic programming">Dynamic Programming</option>
+                  <option value="sorting">Sorting</option>
+                  <option value="searching">Searching</option>
                 </select>
               </div>
             </div>

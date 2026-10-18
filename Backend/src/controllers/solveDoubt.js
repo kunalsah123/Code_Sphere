@@ -1,6 +1,7 @@
 // Google GenAI ka SDK import kar rahe hain
 // Iske through hum Gemini API ko call kar paayenge
 const { GoogleGenAI } = require("@google/genai");
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
 
 // ================== SOLVE DOUBT CONTROLLER ==================
@@ -8,6 +9,13 @@ const { GoogleGenAI } = require("@google/genai");
 // Purpose: User ke doubt ko DSA context me solve karna
 const solveDoubt = async (req, res) => {
     try {
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(503).json({
+                success: false,
+                error: 'Gemini is not configured. Add GEMINI_API_KEY to Backend/.env and restart the backend.'
+            });
+        }
+
         // Step 1: Gemini client ko initialize karna using API key (env se)
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -31,14 +39,36 @@ const solveDoubt = async (req, res) => {
             });
         }
 
+        const contents = messages
+            .filter((message) => ['user', 'model'].includes(message?.role) && Array.isArray(message.parts))
+            .map((message) => ({
+                role: message.role,
+                parts: message.parts
+                    .filter((part) => typeof part?.text === 'string' && part.text.trim())
+                    .map((part) => ({ text: part.text.trim() }))
+            }))
+            .filter((message) => message.parts.length > 0)
+            .slice(-10);
+
+        const latestUserMessage = [...contents].reverse().find((message) => message.role === 'user');
+        if (latestUserMessage?.parts.some((part) => part.text.length > 2000)) {
+            return res.status(400).json({ success: false, error: 'Please keep each message under 2,000 characters.' });
+        }
+
+        if (!contents.some((message) => message.role === 'user')) {
+            return res.status(400).json({ success: false, error: 'Enter a message before asking the AI assistant.' });
+        }
+
         // Inner function banaya hai jo Gemini API ko call karega
         async function main() {
             try {
                 // Step 4: Gemini API call karna with model + context
                 const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",  // Fast aur cost-effective model
-                    contents: messages,        // User ke messages bhej rahe hain
+                    model: GEMINI_MODEL,
+                    contents,                  // Gemini-supported chat history only
                     config: {
+                        maxOutputTokens: 512,
+                        temperature: 0.4,
                         // System instruction: Ye AI ke liye RULEBOOK hai
                         // Isme specify kiya gaya hai ki AI sirf DSA me help kare
                         systemInstruction: `
@@ -47,8 +77,8 @@ You are an expert Data Structures and Algorithms (DSA) tutor specializing in hel
 ## CURRENT PROBLEM CONTEXT:
 [PROBLEM_TITLE]: ${title}
 [PROBLEM_DESCRIPTION]: ${description}
-[EXAMPLES]: ${visibleTestCases}
-[startCode]: ${startCode}
+[EXAMPLES]: ${JSON.stringify(visibleTestCases || [])}
+[startCode]: ${JSON.stringify(startCode || [])}
 
 ## YOUR CAPABILITIES:
 1. Hint Provider

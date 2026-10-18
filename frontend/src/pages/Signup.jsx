@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+// eslint-disable-next-line no-unused-vars -- Used by JSX motion elements below.
 import { motion } from 'framer-motion';
 import { FiUser, FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useState, useEffect } from 'react';
@@ -9,15 +10,20 @@ import { useNavigate, Link } from 'react-router';
 import { registerUser } from '../authSlice';
 
 const signupSchema = z.object({
-  firstName: z.string().min(3, "Name should contain at least 3 characters"),
-  emailId: z.email("Please enter a valid email address"),
-  password: z.string().min(8, "Password should contain at least 8 characters")
+  firstName: z.string().trim().min(3, "Name should contain at least 3 characters").max(20, "Name cannot exceed 20 characters"),
+  emailId: z.email("Please enter a valid email address").transform((email) => email.trim().toLowerCase()),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-z]/, "Password must include a lowercase letter")
+    .regex(/[A-Z]/, "Password must include an uppercase letter")
+    .regex(/[0-9]/, "Password must include a number")
+    .regex(/[^A-Za-z0-9]/, "Password must include a symbol")
 });
 
 function Signup() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, error } = useSelector((state) => state.auth);
+  const { isAuthenticated, loading, error: authError } = useSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
   const [bubbles, setBubbles] = useState([]);
 
@@ -90,6 +96,12 @@ function Signup() {
             <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
             <p className="text-gray-400">Join our community</p>
           </div>
+
+          {authError && (
+            <div role="alert" className="mb-5 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {authError}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="form-group">
@@ -169,6 +181,7 @@ function Signup() {
                   {errors.password.message}
                 </motion.p>
               )}
+              <p className="mt-2 text-xs text-gray-400">Use 8+ characters with uppercase, lowercase, a number, and a symbol.</p>
             </div>
 
             <motion.button

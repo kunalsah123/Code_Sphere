@@ -117,7 +117,7 @@ function AdminUpdate() {
     try {
       setLoading(true);
       // Fetch complete problem details (we need all fields for update)
-      const response = await axiosClient.get(`/problem/problemById/${problemId}`);
+      const response = await axiosClient.get(`/problem/admin/problemById/${problemId}`);
       const problemData = response.data;
       
       setSelectedProblem(problemData);

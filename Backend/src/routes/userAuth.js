@@ -1,7 +1,7 @@
 const express = require('express');
 
 const authrouter = express.Router();
-const { register, login, logout, adminRegister, deleteProfile } = require('../controllers/userAuthenticate');
+const { register, login, logout, adminRegister, deleteProfile, getProfile, updateProfile, changePassword } = require('../controllers/userAuthenticate');
 const userMiddleware = require('../middleware/userMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 
@@ -11,6 +11,9 @@ authrouter.post('/login', login);
 authrouter.post('/logout', userMiddleware, logout);
 authrouter.post('/admin/register', adminMiddleware, adminRegister);
 authrouter.delete('/deleteProfile', userMiddleware, deleteProfile);
+authrouter.get('/profile', userMiddleware, getProfile);
+authrouter.patch('/profile', userMiddleware, updateProfile);
+authrouter.patch('/change-password', userMiddleware, changePassword);
 
 //this is set so that we don't have to login again and again whenver we visit the website
 authrouter.get('/check', userMiddleware, (req, res) => {
