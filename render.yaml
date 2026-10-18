@@ -3,7 +3,7 @@ services:
     name: codemaster-backend
     runtime: node
     plan: free
-    buildCommand: cd Backend && npm ci
+    buildCommand: cd Backend && npm install
     startCommand: cd Backend && npm start
     healthCheckPath: /health
     envVars:
