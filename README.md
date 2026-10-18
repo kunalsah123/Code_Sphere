@@ -1,5 +1,7 @@
 # CodeSphere - Full-Stack Coding Platform
 
+[**Live Demo**](https://codemaster-frontend-g1fq.onrender.com)
+
 A full-stack coding practice platform with an online editor, code execution, progress tracking, AI help, video tutorials, and team coding rooms.
 
 ## Features
