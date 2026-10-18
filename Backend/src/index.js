@@ -20,7 +20,7 @@ const configureCollaborationSocket = require('./config/collaborationSocket');
 
 
 const defaultCorsOrigins = process.env.NODE_ENV === 'production'
-    ? ['https://codemaster-frontend.onrender.com']
+    ? ['https://codemaster-frontend-g1fq.onrender.com']
     : [
         'http://localhost:5173',
         'http://127.0.0.1:5173',

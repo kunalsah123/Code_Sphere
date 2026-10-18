@@ -12,9 +12,9 @@ services:
       - key: NODE_VERSION
         value: 22.12.0
       - key: FRONTEND_URL
-        value: https://codemaster-frontend.onrender.com
+        value: https://codemaster-frontend-g1fq.onrender.com
       - key: CORS_ORIGINS
-        value: https://codemaster-frontend.onrender.com
+        value: https://codemaster-frontend-g1fq.onrender.com
       - key: MONGO_URI
         sync: false
       - key: REDIS_URL
@@ -39,7 +39,7 @@ services:
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL
-        value: https://codemaster-backend.onrender.com
+        value: https://codemaster-backend-64ug.onrender.com
       - key: NODE_VERSION
         value: 22.12.0
     routes:
